@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+python-multipart
+requests
+rembg
+pillow
+numpy
+aiohttp
+google-generativeai
