@@ -1,8 +1,17 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { generateAssetPipeline, addImageToCanvas } from '../features/assetService';
 import { scanCanvasText, getTranslations, createLocalizedVariants } from '../features/localizationService';
+import { saveAsNewVersion, loadVersionHistory, type DesignVersion } from '../features/versionService';
+import { Save, GitBranch } from 'lucide-react';
 
 const GeneratePage = () => {
+  // --- Version Control State ---
+  const [currentDesignId, setCurrentDesignId] = useState<number | null>(null);
+  const [versions, setVersions] = useState<DesignVersion[]>([]);
+  const [isSavingVersion, setIsSavingVersion] = useState(false);
+  const [showVersionDialog, setShowVersionDialog] = useState(false);
+  const [commitMessage, setCommitMessage] = useState('');
+
   // --- UI State: Asset Gen ---
   const [prompt, setPrompt] = useState("");
   const [category, setCategory] = useState("Illustration");
@@ -16,6 +25,56 @@ const GeneratePage = () => {
   const [locStatus, setLocStatus] = useState("");
 
   const languages = ["Hindi", "Marathi", "Spanish"];
+
+  // --- Load design ID from URL params or localStorage ---
+  useEffect(() => {
+    // TODO: Get designId from route params when routing is implemented
+    // For now, use a hardcoded ID or from localStorage
+    const storedDesignId = localStorage.getItem('currentDesignId');
+    if (storedDesignId) {
+      const id = parseInt(storedDesignId);
+      setCurrentDesignId(id);
+      loadVersions(id);
+    }
+  }, []);
+
+  const loadVersions = async (designId: number) => {
+    const versionHistory = await loadVersionHistory(designId);
+    setVersions(versionHistory);
+  };
+
+  // --- Version Control Handlers ---
+  const handleSaveVersion = async () => {
+    if (!currentDesignId) {
+      alert('No design selected. Please create a design from Inbox first.');
+      return;
+    }
+
+    setIsSavingVersion(true);
+    try {
+      const result = await saveAsNewVersion(currentDesignId, commitMessage || undefined);
+      
+      if (result.success) {
+        alert(`✅ Version ${result.version?.versionNumber} saved successfully!`);
+        setCommitMessage('');
+        setShowVersionDialog(false);
+        
+        // Reload version history
+        await loadVersions(currentDesignId);
+      } else {
+        alert(`❌ Failed to save version: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Error saving version:', error);
+      alert('Failed to save version. Please try again.');
+    } finally {
+      setIsSavingVersion(false);
+    }
+  };
+
+  const getNextVersionNumber = () => {
+    return versions.length + 1;
+  };
 
   // --- Handlers: Asset Generator ---
   const handleGenerate = async () => {
@@ -93,6 +152,70 @@ const GeneratePage = () => {
 
   return (
     <div className="space-y-4 pb-10">
+
+      {/* Version Control Header */}
+      {currentDesignId && (
+        <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl p-4 text-white shadow-lg">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center gap-3">
+              <GitBranch size={24} />
+              <div>
+                <h3 className="font-bold text-lg">Design #{currentDesignId}</h3>
+                <p className="text-blue-100 text-sm">
+                  {versions.length > 0 
+                    ? `Current: V${versions[versions.length - 1].versionNumber} • ${versions.length} version(s)` 
+                    : 'No versions saved yet'}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowVersionDialog(true)}
+              disabled={isSavingVersion}
+              className="bg-white text-blue-600 px-4 py-2 rounded-lg font-semibold hover:bg-blue-50 transition-all duration-200 flex items-center gap-2 disabled:opacity-50"
+            >
+              <Save size={18} />
+              Save as V{getNextVersionNumber()}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Version Save Dialog */}
+      {showVersionDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setShowVersionDialog(false)}>
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-xl font-bold text-gray-900 mb-4">Save as Version {getNextVersionNumber()}</h3>
+            
+            <div className="mb-4">
+              <label className="text-sm font-semibold text-gray-900 mb-2 block">
+                Commit Message (Optional)
+              </label>
+              <textarea
+                value={commitMessage}
+                onChange={(e) => setCommitMessage(e.target.value)}
+                placeholder="What changes did you make?"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 h-24 resize-none"
+              />
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowVersionDialog(false)}
+                className="flex-1 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-semibold hover:bg-gray-300 transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveVersion}
+                disabled={isSavingVersion}
+                className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSavingVersion ? 'Saving...' : 'Save Version'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Asset Generator UI */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">

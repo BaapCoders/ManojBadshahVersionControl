@@ -1,0 +1,92 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ===================== WHATSAPP MESSAGE ===================== 
+model WhatsAppMessage {
+  id        Int      @id @default(autoincrement())
+  from      String
+  text      String
+  messageId String   @unique
+  createdAt DateTime @default(now())
+}
+
+// ===================== CLIENT ===================== 
+model Client {
+  id          Int      @id @default(autoincrement())
+  phoneNumber String   @unique
+  name        String?
+  briefs      Brief[]
+  createdAt   DateTime @default(now())
+}
+
+// ===================== BRIEF ===================== 
+model Brief {
+  id          Int      @id @default(autoincrement())
+  clientId    Int
+  client      Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  messageId   String   @unique // Link to WhatsAppMessage
+  description String
+  status      String   @default("pending") // pending, in-progress, completed
+  designs     Design[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ===================== DESIGN ===================== 
+model Design {
+  id             Int             @id @default(autoincrement())
+  briefId        Int
+  brief          Brief           @relation(fields: [briefId], references: [id], onDelete: Cascade)
+  title          String
+  currentVersion Int             @default(1)
+  versions       DesignVersion[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+}
+
+// ===================== DESIGN VERSION ===================== 
+model DesignVersion {
+  id             Int       @id @default(autoincrement())
+  designId       Int
+  design         Design    @relation(fields: [designId], references: [id], onDelete: Cascade)
+  versionNumber  Int
+  commitMessage  String?   // Git-like commit message
+  adobeProjectId String?   // Adobe Express project ID (page ID for cloned pages)
+  previewUrl     String?   // Preview image URL
+  serializedState String?  @db.Text // JSON serialized canvas state for restore
+  assets         Asset[]
+  feedback       Feedback[]
+  createdBy      String    @default("designer") // "designer" or "auto"
+  createdAt      DateTime  @default(now())
+
+  @@unique([designId, versionNumber])
+}
+
+// ===================== ASSET ===================== 
+model Asset {
+  id        Int           @id @default(autoincrement())
+  versionId Int
+  version   DesignVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  fileUrl   String        // Cloud storage URL
+  fileType  String        // "image", "pdf", "adobe-express"
+  fileName  String
+  fileSize  Int?
+  createdAt DateTime      @default(now())
+}
+
+// ===================== FEEDBACK ===================== 
+model Feedback {
+  id        Int           @id @default(autoincrement())
+  versionId Int
+  version   DesignVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  from      String        // Phone number or approver name
+  message   String
+  status    String        @default("pending") // pending, applied, ignored
+  createdAt DateTime      @default(now())
+}
