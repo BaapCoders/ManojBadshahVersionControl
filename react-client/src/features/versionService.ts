@@ -64,7 +64,11 @@ export const saveAsNewVersion = async (
 
     // Clone page in Adobe Express
     console.log(`🎨 Creating page clone for V${nextVersionNumber}...`);
-    const cloneResult = await sandbox.saveVersion(nextVersionNumber);
+    const cloneResult = await sandbox.captureVersionSnapshot();
+
+    if (!cloneResult.success) {
+      throw new Error('Failed to capture version snapshot');
+    }
 
     // Save to backend
     console.log('💾 Saving to backend...');
@@ -73,7 +77,7 @@ export const saveAsNewVersion = async (
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         commitMessage: commitMessage || `Version ${nextVersionNumber}`,
-        adobeProjectId: cloneResult.pageId,
+        adobeProjectId: cloneResult.snapshotPageId,
         serializedState: serializedState,
         // previewUrl would come from image export
       }),

@@ -1,6 +1,6 @@
 import addOnSandboxSdk from "add-on-sdk-document-sandbox";
 import { scanForText, createPageVariant } from "./features/localization";
-import { saveVersion, serializeCanvas, restoreFromJson, exportPreview } from "./features/versionControl";
+import { captureVersionSnapshot, restoreVersionSnapshot, serializeCanvas, restoreFromJson, exportPreview } from "./features/versionControl";
 
 const { runtime } = addOnSandboxSdk.instance;
 
@@ -13,7 +13,8 @@ runtime.exposeApi({
     createVariant: async (lang, trans) => await createPageVariant(lang, trans),
     
     // Version Control APIs
-    saveVersion: async (versionNumber) => await saveVersion(versionNumber),
+    captureVersionSnapshot: async () => await captureVersionSnapshot(),
+    restoreVersionSnapshot: async (snapshotPageId) => await restoreVersionSnapshot(snapshotPageId),
     serializeCanvas: async () => await serializeCanvas(),
     restoreFromJson: async (jsonString) => await restoreFromJson(jsonString),
     exportPreview: async () => await exportPreview()
