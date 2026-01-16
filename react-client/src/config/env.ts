@@ -23,11 +23,11 @@ declare const __ENV__: EnvironmentConfig;
 export const config: EnvironmentConfig = {
   API_URL: typeof __ENV__ !== 'undefined' && __ENV__.API_URL 
     ? __ENV__.API_URL 
-    : 'http://localhost:8080',
+    : 'http://localhost:1',
   
   PYTHON_SERVER_URL: typeof __ENV__ !== 'undefined' && __ENV__.PYTHON_SERVER_URL
     ? __ENV__.PYTHON_SERVER_URL
-    : 'http://127.0.0.1:8000',
+    : 'http://127.0.0.1:2',
   
   VERSION: typeof __ENV__ !== 'undefined' && __ENV__.VERSION
     ? __ENV__.VERSION

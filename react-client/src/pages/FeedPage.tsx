@@ -5,10 +5,10 @@ import {
   getVersionPNG,
   restoreVersionToCanvas,
   updateFeedbackStatus,
+  saveAsNewVersion,
   type DesignVersion
 } from '../features/versionService';
-import { showSuccessDialog, showErrorDialog, showWarningDialog } from '../utils/dialogUtils';
-import { GitBranch, Eye, RotateCcw, MessageSquare, CheckCircle, XCircle, X } from 'lucide-react';
+import { GitBranch, Eye, RotateCcw, MessageSquare, CheckCircle, XCircle, X, Save } from 'lucide-react';
 
 interface Feedback {
   id: number;
@@ -27,6 +27,9 @@ const FeedPage = () => {
   const [viewingPNG, setViewingPNG] = useState<string | null>(null);
   const [restoringVersion, setRestoringVersion] = useState<number | null>(null);
   const [updatingFeedback, setUpdatingFeedback] = useState<number | null>(null);
+  const [isSavingVersion, setIsSavingVersion] = useState(false);
+  const [showVersionDialog, setShowVersionDialog] = useState(false);
+  const [commitMessage, setCommitMessage] = useState('');
 
   useEffect(() => {
     const storedDesignId = localStorage.getItem('currentDesignId');
@@ -63,7 +66,7 @@ const FeedPage = () => {
     if (pngUrl) {
       setViewingPNG(pngUrl);
     } else {
-      await showWarningDialog('No PNG preview available for this version');
+      console.warn('No PNG preview available for this version');
     }
   };
 
@@ -73,13 +76,42 @@ const FeedPage = () => {
     setRestoringVersion(versionNumber);
     try {
       await restoreVersionToCanvas(currentDesignId, versionNumber);
-      await showSuccessDialog(`Version ${versionNumber} restored to canvas!`);
     } catch (error) {
       console.error('Failed to restore version:', error);
-      await showErrorDialog(`Failed to restore version: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setRestoringVersion(null);
     }
+  };
+
+  const handleSaveVersion = async () => {
+    if (!currentDesignId) {
+      console.warn('No design selected. Please create a design from Inbox first.');
+      return;
+    }
+
+    setIsSavingVersion(true);
+    try {
+      const result = await saveAsNewVersion(currentDesignId, commitMessage || undefined);
+      
+      if (result.success) {
+        console.log(`Version ${result.version?.versionNumber} saved successfully!`);
+        setCommitMessage('');
+        setShowVersionDialog(false);
+        
+        // Reload version history
+        await loadData(currentDesignId);
+      } else {
+        console.error(`Failed to save version: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Error saving version:', error);
+    } finally {
+      setIsSavingVersion(false);
+    }
+  };
+
+  const getNextVersionNumber = () => {
+    return versions.length + 1;
   };
 
   const handleUpdateFeedbackStatus = async (
@@ -95,13 +127,12 @@ const FeedPage = () => {
         setFeedback(feedback.map(f =>
           f.id === feedbackId ? { ...f, status: newStatus } : f
         ));
-        await showSuccessDialog(`Feedback marked as ${newStatus}`);
+        console.log(`Feedback marked as ${newStatus}`);
       } else {
-        await showErrorDialog('Failed to update feedback status');
+        console.error('Failed to update feedback status');
       }
     } catch (error) {
       console.error('Error updating feedback:', error);
-      await showErrorDialog('Failed to update feedback. Please try again.');
     } finally {
       setUpdatingFeedback(null);
     }
@@ -162,6 +193,14 @@ const FeedPage = () => {
               <p className="text-sm text-gray-600">{versions.length} version{versions.length !== 1 ? 's' : ''} saved</p>
             </div>
           </div>
+          <button
+            onClick={() => setShowVersionDialog(true)}
+            disabled={isSavingVersion}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-700 transition-all duration-200 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md active:scale-95"
+          >
+            <Save size={18} />
+            Save as V{getNextVersionNumber()}
+          </button>
         </div>
 
         {versions.length > 0 ? (
@@ -365,6 +404,10 @@ const FeedPage = () => {
         <ul className="text-sm text-purple-800 space-y-2">
           <li className="flex items-start gap-2">
             <span className="text-purple-600 mt-0.5">•</span>
+            <span><strong>Save Version:</strong> Click "Save as V{getNextVersionNumber()}" to save current canvas state with optional commit message</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="text-purple-600 mt-0.5">•</span>
             <span><strong>Version History:</strong> Click "Restore" to revert canvas to any saved version</span>
           </li>
           <li className="flex items-start gap-2">
@@ -373,10 +416,47 @@ const FeedPage = () => {
           </li>
           <li className="flex items-start gap-2">
             <span className="text-purple-600 mt-0.5">•</span>
-            <span><strong>Workflow:</strong> Save versions in Generate tab, review them here</span>
+            <span><strong>Workflow:</strong> Save versions here or in Generate tab, review and restore as needed</span>
           </li>
         </ul>
       </div>
+
+      {/* Version Save Dialog */}
+      {showVersionDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setShowVersionDialog(false)}>
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-xl font-bold text-gray-900 mb-4">Save as Version {getNextVersionNumber()}</h3>
+            
+            <div className="mb-4">
+              <label className="text-sm font-semibold text-gray-900 mb-2 block">
+                Commit Message (Optional)
+              </label>
+              <textarea
+                value={commitMessage}
+                onChange={(e) => setCommitMessage(e.target.value)}
+                placeholder="What changes did you make?"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 h-24 resize-none"
+              />
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowVersionDialog(false)}
+                className="flex-1 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-semibold hover:bg-gray-300 transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveVersion}
+                disabled={isSavingVersion}
+                className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSavingVersion ? 'Saving...' : 'Save Version'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* PNG Viewer Modal */}
       {viewingPNG && (
