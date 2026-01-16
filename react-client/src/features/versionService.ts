@@ -169,7 +169,7 @@ export const getVersionPNG = async (designId: number, versionNumber: number): Pr
 };
 
 /**
- * Restore version by importing PNG to canvas
+ * Restore version by importing PNG to canvas with automatic page resize
  * @param designId - The design ID
  * @param versionNumber - The version number
  * @returns Success status
@@ -190,10 +190,19 @@ export const restoreVersionToCanvas = async (designId: number, versionNumber: nu
     const blob = await response.blob();
     console.log(`✅ Downloaded: ${blob.size} bytes`);
 
-    // Add to Adobe Express canvas
-    console.log('🎨 Adding image to canvas...');
-    await addOnUISdk.app.document.addImage(blob);
-    console.log('✅ Image added to canvas successfully!');
+    // Import to canvas with automatic page resize to match image dimensions
+    console.log('🎨 Adding image to canvas and resizing page...');
+    
+    // Get the document sandbox API proxy through the UI SDK's runtime
+    // @ts-ignore
+    const sandboxProxy = await addOnUISdk.instance.runtime.apiProxy("documentSandbox");
+    const result = await sandboxProxy.importImageWithPageResize(blob);
+    
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to import image');
+    }
+    
+    console.log('✅ Image added to canvas successfully with page resized!');
 
     return true;
   } catch (error) {
