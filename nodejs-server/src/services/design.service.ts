@@ -334,6 +334,88 @@ export const compareVersions = async (designId: number, version1: number, versio
   };
 };
 
+/**
+ * DELETE VERSION: Delete a version and its PNG from S3
+ * @param designId - Design ID
+ * @param versionNumber - Version number to delete
+ * @returns Success status
+ */
+export const deleteVersion = async (designId: number, versionNumber: number): Promise<boolean> => {
+  try {
+    // Find the version
+    const version = await prisma.designVersion.findFirst({
+      where: {
+        designId,
+        versionNumber
+      }
+    });
+
+    if (!version) {
+      throw new Error(`Version ${versionNumber} not found`);
+    }
+
+    console.log(`🗑️ Deleting version ${versionNumber} for design ${designId}...`);
+
+    // Delete PNG from S3 if it exists
+    if (version.previewUrl) {
+      console.log(`🗑️ Deleting PNG from S3: ${version.previewUrl}`);
+      const { deleteS3Object } = await import('./s3Upload.service');
+      const deleted = await deleteS3Object(version.previewUrl);
+      
+      if (!deleted) {
+        console.warn('⚠️ Failed to delete PNG from S3, but continuing with database deletion');
+      }
+    }
+
+    // Delete version from database (will cascade delete assets and feedback)
+    await prisma.designVersion.delete({
+      where: { id: version.id }
+    });
+
+    console.log(`✅ Version ${versionNumber} deleted successfully`);
+
+    // Update remaining version numbers to maintain sequence
+    const remainingVersions = await prisma.designVersion.findMany({
+      where: {
+        designId,
+        versionNumber: { gt: versionNumber }
+      },
+      orderBy: { versionNumber: 'asc' }
+    });
+
+    // Renumber subsequent versions
+    for (const v of remainingVersions) {
+      await prisma.designVersion.update({
+        where: { id: v.id },
+        data: { versionNumber: v.versionNumber - 1 }
+      });
+    }
+
+    // Update design's current version if needed
+    const design = await prisma.design.findUnique({
+      where: { id: designId },
+      include: {
+        versions: {
+          orderBy: { versionNumber: 'desc' },
+          take: 1
+        }
+      }
+    });
+
+    if (design && design.versions.length > 0) {
+      await prisma.design.update({
+        where: { id: designId },
+        data: { currentVersion: design.versions[0].versionNumber }
+      });
+    }
+
+    return true;
+  } catch (error) {
+    console.error('❌ Failed to delete version:', error);
+    throw error;
+  }
+};
+
 // ===================== FEEDBACK MANAGEMENT =====================
 
 /**

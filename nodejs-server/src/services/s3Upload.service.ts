@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { config } from '../config';
 import crypto from 'crypto';
@@ -123,5 +123,49 @@ export const uploadBase64PNG = async (
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
     };
+  }
+};
+
+/**
+ * Delete PNG from S3 by URL
+ * @param url - Full S3 URL (e.g., https://bucket.s3.region.amazonaws.com/key)
+ * @returns Success status
+ */
+export const deleteS3Object = async (url: string): Promise<boolean> => {
+  try {
+    // Extract key from URL
+    // Format: https://bucket.s3.region.amazonaws.com/designs/1/versions/v2-123456-abc.png
+    const urlParts = new URL(url);
+    const key = urlParts.pathname.substring(1); // Remove leading /
+
+    console.log(`🗑️ Deleting from S3: ${key}`);
+
+    const command = new DeleteObjectCommand({
+      Bucket: config.aws.s3Bucket,
+      Key: key,
+    });
+
+    await s3Client.send(command);
+
+    console.log(`✅ Successfully deleted from S3: ${key}`);
+    return true;
+  } catch (error) {
+    console.error('❌ S3 deletion failed:', error);
+    return false;
+  }
+};
+
+/**
+ * Extract S3 key from full URL
+ * @param url - Full S3 URL
+ * @returns S3 object key or null
+ */
+export const extractS3Key = (url: string): string | null => {
+  try {
+    const urlParts = new URL(url);
+    return urlParts.pathname.substring(1); // Remove leading /
+  } catch (error) {
+    console.error('❌ Invalid S3 URL:', error);
+    return null;
   }
 };

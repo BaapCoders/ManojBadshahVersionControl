@@ -6,9 +6,10 @@ import {
   restoreVersionToCanvas,
   updateFeedbackStatus,
   saveAsNewVersion,
+  deleteVersion,
   type DesignVersion
 } from '../features/versionService';
-import { GitBranch, Eye, RotateCcw, MessageSquare, CheckCircle, XCircle, X, Save } from 'lucide-react';
+import { GitBranch, Eye, RotateCcw, MessageSquare, CheckCircle, XCircle, X, Save, Trash2 } from 'lucide-react';
 
 interface Feedback {
   id: number;
@@ -27,6 +28,7 @@ const FeedPage = () => {
   const [viewingPNG, setViewingPNG] = useState<string | null>(null);
   const [restoringVersion, setRestoringVersion] = useState<number | null>(null);
   const [updatingFeedback, setUpdatingFeedback] = useState<number | null>(null);
+  const [deletingVersion, setDeletingVersion] = useState<number | null>(null);
   const [isSavingVersion, setIsSavingVersion] = useState(false);
   const [showVersionDialog, setShowVersionDialog] = useState(false);
   const [commitMessage, setCommitMessage] = useState('');
@@ -92,12 +94,12 @@ const FeedPage = () => {
     setIsSavingVersion(true);
     try {
       const result = await saveAsNewVersion(currentDesignId, commitMessage || undefined);
-      
+
       if (result.success) {
         console.log(`Version ${result.version?.versionNumber} saved successfully!`);
         setCommitMessage('');
         setShowVersionDialog(false);
-        
+
         // Reload version history
         await loadData(currentDesignId);
       } else {
@@ -112,6 +114,32 @@ const FeedPage = () => {
 
   const getNextVersionNumber = () => {
     return versions.length + 1;
+  };
+
+  const handleDeleteVersion = async (versionNumber: number) => {
+    if (!currentDesignId) return;
+    
+    console.log('Delete version clicked', versionNumber);
+    
+    setDeletingVersion(versionNumber);
+    try {
+      const success = await deleteVersion(currentDesignId, versionNumber);
+      
+      if (success) {
+        console.log(`✅ Version ${versionNumber} deleted successfully!`);
+        
+        // Reload version history to reflect changes
+        await loadData(currentDesignId);
+      } else {
+        console.error('Failed to delete version');
+        alert('Failed to delete version. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error deleting version:', error);
+      alert('Error deleting version. Please try again.');
+    } finally {
+      setDeletingVersion(null);
+    }
   };
 
   const handleUpdateFeedbackStatus = async (
@@ -214,8 +242,8 @@ const FeedPage = () => {
                   {/* PNG Preview Thumbnail */}
                   <div className="flex-shrink-0">
                     {version.previewUrl ? (
-                      <img 
-                        src={version.previewUrl} 
+                      <img
+                        src={version.previewUrl}
                         alt={`V${version.versionNumber} Preview`}
                         className="w-24 h-24 object-cover rounded-lg border-2 border-gray-200 shadow-sm"
                         onError={(e) => {
@@ -268,8 +296,8 @@ const FeedPage = () => {
                       onClick={() => handleViewPNG(version.versionNumber)}
                       disabled={!version.previewUrl}
                       className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all shadow-sm ${!version.previewUrl
-                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                          : 'bg-purple-600 text-white hover:bg-purple-700 hover:shadow-md active:scale-95'
+                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        : 'bg-purple-600 text-white hover:bg-purple-700 hover:shadow-md active:scale-95'
                         }`}
                     >
                       <Eye size={16} />
@@ -279,12 +307,25 @@ const FeedPage = () => {
                       onClick={() => handleRestoreVersion(version.versionNumber)}
                       disabled={!version.previewUrl || restoringVersion === version.versionNumber}
                       className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all shadow-sm ${!version.previewUrl || restoringVersion === version.versionNumber
-                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                          : 'bg-blue-600 text-white hover:bg-blue-700 hover:shadow-md active:scale-95'
+                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        : 'bg-blue-600 text-white hover:bg-blue-700 hover:shadow-md active:scale-95'
                         }`}
                     >
                       <RotateCcw size={16} className={restoringVersion === version.versionNumber ? 'animate-spin' : ''} />
                       {restoringVersion === version.versionNumber ? 'Loading...' : 'Restore'}
+                    </button>
+                    <button
+                      onClick={() => handleDeleteVersion(version.versionNumber)}
+                      disabled={deletingVersion === version.versionNumber || versions.length === 1}
+                      className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all shadow-sm ${deletingVersion === version.versionNumber || versions.length === 1
+                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        : 'bg-red-600 text-white hover:bg-red-700 hover:shadow-md active:scale-95'
+                        }`}
+                      title={versions.length === 1 ? 'Cannot delete the last version' : 'Delete this version and its PNG from S3'}
+                    >
+                      <Trash2 size={16} className={deletingVersion === version.versionNumber ? 'animate-spin' : ''}
+                      />
+                      {deletingVersion === version.versionNumber ? 'Deleting...' : 'Delete'}
                     </button>
                   </div>
                 </div>
@@ -426,7 +467,7 @@ const FeedPage = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setShowVersionDialog(false)}>
           <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-xl font-bold text-gray-900 mb-4">Save as Version {getNextVersionNumber()}</h3>
-            
+
             <div className="mb-4">
               <label className="text-sm font-semibold text-gray-900 mb-2 block">
                 Commit Message (Optional)
@@ -460,7 +501,7 @@ const FeedPage = () => {
 
       {/* PNG Viewer Modal */}
       {viewingPNG && (
-        <div 
+        <div
           className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
           onClick={() => setViewingPNG(null)}
         >
@@ -471,9 +512,9 @@ const FeedPage = () => {
             >
               <X size={24} />
             </button>
-            <img 
-              src={viewingPNG} 
-              alt="Version Preview" 
+            <img
+              src={viewingPNG}
+              alt="Version Preview"
               className="max-w-full max-h-[90vh] object-contain"
               onClick={(e) => e.stopPropagation()}
             />

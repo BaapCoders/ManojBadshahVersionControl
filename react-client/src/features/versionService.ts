@@ -251,3 +251,30 @@ export const updateFeedbackStatus = async (
     return false;
   }
 };
+
+/**
+ * Delete a version and its PNG from S3
+ * @param designId - The design ID
+ * @param versionNumber - The version number to delete
+ * @returns Success status
+ */
+export const deleteVersion = async (designId: number, versionNumber: number): Promise<boolean> => {
+  try {
+    console.log(`🗑️ Deleting version ${versionNumber} for design ${designId}...`);
+    
+    const response = await fetch(`${API_BASE_URL}/designs/${designId}/versions/${versionNumber}`, {
+      method: 'DELETE',
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to delete version');
+    }
+
+    console.log(`✅ Version ${versionNumber} deleted successfully`);
+    return true;
+  } catch (error) {
+    console.error('❌ Failed to delete version:', error);
+    return false;
+  }
+};

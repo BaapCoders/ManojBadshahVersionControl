@@ -270,6 +270,31 @@ router.get('/designs/:id/compare', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * DELETE /api/designs/:id/versions/:versionNumber - Delete a version and its S3 PNG
+ */
+router.delete('/designs/:id/versions/:versionNumber', async (req: Request, res: Response) => {
+  try {
+    const designId = parseInt(req.params.id);
+    const versionNumber = parseInt(req.params.versionNumber);
+    
+    if (isNaN(designId) || isNaN(versionNumber)) {
+      return res.status(400).json({ error: 'Invalid designId or versionNumber' });
+    }
+    
+    const success = await designService.deleteVersion(designId, versionNumber);
+    
+    if (success) {
+      res.json({ success: true, message: `Version ${versionNumber} deleted successfully` });
+    } else {
+      res.status(500).json({ error: 'Failed to delete version' });
+    }
+  } catch (error: any) {
+    console.error('Error deleting version:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ===================== FEEDBACK ROUTES =====================
 
 /**
