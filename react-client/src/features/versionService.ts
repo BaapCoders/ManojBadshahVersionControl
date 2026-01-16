@@ -169,6 +169,40 @@ export const getVersionPNG = async (designId: number, versionNumber: number): Pr
 };
 
 /**
+ * Restore version by importing PNG to canvas
+ * @param designId - The design ID
+ * @param versionNumber - The version number
+ * @returns Success status
+ */
+export const restoreVersionToCanvas = async (designId: number, versionNumber: number): Promise<boolean> => {
+  try {
+    console.log(`🔄 Restoring V${versionNumber} to canvas...`);
+    
+    // Fetch PNG through backend proxy (bypasses CORS)
+    const proxyUrl = `${API_BASE_URL}/designs/${designId}/versions/${versionNumber}/png`;
+    console.log('📥 Downloading PNG via backend proxy...');
+    
+    const response = await fetch(proxyUrl);
+    if (!response.ok) {
+      throw new Error(`Failed to download PNG: ${response.statusText}`);
+    }
+    
+    const blob = await response.blob();
+    console.log(`✅ Downloaded: ${blob.size} bytes`);
+
+    // Add to Adobe Express canvas
+    console.log('🎨 Adding image to canvas...');
+    await addOnUISdk.app.document.addImage(blob);
+    console.log('✅ Image added to canvas successfully!');
+
+    return true;
+  } catch (error) {
+    console.error('❌ Failed to restore version:', error);
+    throw error;
+  }
+};
+
+/**
  * Get feedback for a design
  * @param designId - The design ID
  * @returns Array of feedback items

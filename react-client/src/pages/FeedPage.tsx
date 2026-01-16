@@ -3,10 +3,11 @@ import {
   loadVersionHistory,
   loadFeedback,
   getVersionPNG,
+  restoreVersionToCanvas,
   updateFeedbackStatus,
   type DesignVersion
 } from '../features/versionService';
-import { GitBranch, Eye, MessageSquare, CheckCircle, XCircle, X } from 'lucide-react';
+import { GitBranch, Eye, RotateCcw, MessageSquare, CheckCircle, XCircle, X } from 'lucide-react';
 
 interface Feedback {
   id: number;
@@ -23,6 +24,7 @@ const FeedPage = () => {
   const [feedback, setFeedback] = useState<Feedback[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewingPNG, setViewingPNG] = useState<string | null>(null);
+  const [restoringVersion, setRestoringVersion] = useState<number | null>(null);
   const [updatingFeedback, setUpdatingFeedback] = useState<number | null>(null);
 
   useEffect(() => {
@@ -61,6 +63,21 @@ const FeedPage = () => {
       setViewingPNG(pngUrl);
     } else {
       alert('No PNG preview available for this version');
+    }
+  };
+
+  const handleRestoreVersion = async (versionNumber: number) => {
+    if (!currentDesignId) return;
+
+    setRestoringVersion(versionNumber);
+    try {
+      await restoreVersionToCanvas(currentDesignId, versionNumber);
+      alert(`✅ Version ${versionNumber} restored to canvas!`);
+    } catch (error) {
+      console.error('Failed to restore version:', error);
+      alert(`❌ Failed to restore version: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setRestoringVersion(null);
     }
   };
 
@@ -206,17 +223,30 @@ const FeedPage = () => {
                     </div>
                   </div>
 
-                  <button
-                    onClick={() => handleViewPNG(version.versionNumber)}
-                    disabled={!version.previewUrl}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all shadow-sm ${!version.previewUrl
-                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                        : 'bg-purple-600 text-white hover:bg-purple-700 hover:shadow-md active:scale-95'
-                      }`}
-                  >
-                    <Eye size={16} />
-                    View PNG
-                  </button>
+                  <div className="flex flex-col gap-2">
+                    <button
+                      onClick={() => handleViewPNG(version.versionNumber)}
+                      disabled={!version.previewUrl}
+                      className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all shadow-sm ${!version.previewUrl
+                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                          : 'bg-purple-600 text-white hover:bg-purple-700 hover:shadow-md active:scale-95'
+                        }`}
+                    >
+                      <Eye size={16} />
+                      View
+                    </button>
+                    <button
+                      onClick={() => handleRestoreVersion(version.versionNumber)}
+                      disabled={!version.previewUrl || restoringVersion === version.versionNumber}
+                      className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all shadow-sm ${!version.previewUrl || restoringVersion === version.versionNumber
+                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                          : 'bg-blue-600 text-white hover:bg-blue-700 hover:shadow-md active:scale-95'
+                        }`}
+                    >
+                      <RotateCcw size={16} className={restoringVersion === version.versionNumber ? 'animate-spin' : ''} />
+                      {restoringVersion === version.versionNumber ? 'Loading...' : 'Restore'}
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}

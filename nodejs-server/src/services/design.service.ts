@@ -265,6 +265,18 @@ export const getVersionById = async (versionId: number) => {
 };
 
 /**
+ * GET VERSION BY NUMBER: Get version by design ID and version number
+ */
+export const getVersionByNumber = async (designId: number, versionNumber: number) => {
+  return await prisma.designVersion.findFirst({
+    where: {
+      designId,
+      versionNumber
+    }
+  });
+};
+
+/**
  * REVERT: Restore a previous version (like git revert)
  * Creates a new version that is a copy of the target version
  */

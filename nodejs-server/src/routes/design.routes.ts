@@ -160,6 +160,43 @@ router.post('/designs/:id/versions', async (req: Request, res: Response) => {
 });
 
 /**
+ * GET /api/designs/:id/versions/:versionNumber/png - Proxy PNG from S3
+ * This bypasses CORS issues by serving the PNG through our backend
+ */
+router.get('/designs/:id/versions/:versionNumber/png', async (req: Request, res: Response) => {
+  try {
+    const designId = parseInt(req.params.id);
+    const versionNumber = parseInt(req.params.versionNumber);
+    
+    // Get version from database
+    const version = await designService.getVersionByNumber(designId, versionNumber);
+    
+    if (!version || !version.previewUrl) {
+      return res.status(404).json({ error: 'Version or preview not found' });
+    }
+
+    // Fetch PNG from S3
+    const s3Response = await fetch(version.previewUrl);
+    
+    if (!s3Response.ok) {
+      return res.status(502).json({ error: 'Failed to fetch from S3' });
+    }
+
+    const pngBuffer = await s3Response.arrayBuffer();
+    
+    // Set proper headers and send PNG
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cache-Control', 'public, max-age=31536000');
+    res.send(Buffer.from(pngBuffer));
+    
+  } catch (error: any) {
+    console.error('Error proxying PNG:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
  * GET /api/designs/:id/versions - Get version history
  */
 router.get('/designs/:id/versions', async (req: Request, res: Response) => {
