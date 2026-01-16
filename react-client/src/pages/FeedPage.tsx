@@ -7,6 +7,7 @@ import {
   updateFeedbackStatus,
   type DesignVersion
 } from '../features/versionService';
+import { showSuccessDialog, showErrorDialog, showWarningDialog } from '../utils/dialogUtils';
 import { GitBranch, Eye, RotateCcw, MessageSquare, CheckCircle, XCircle, X } from 'lucide-react';
 
 interface Feedback {
@@ -62,7 +63,7 @@ const FeedPage = () => {
     if (pngUrl) {
       setViewingPNG(pngUrl);
     } else {
-      alert('No PNG preview available for this version');
+      await showWarningDialog('No PNG preview available for this version');
     }
   };
 
@@ -72,10 +73,10 @@ const FeedPage = () => {
     setRestoringVersion(versionNumber);
     try {
       await restoreVersionToCanvas(currentDesignId, versionNumber);
-      alert(`✅ Version ${versionNumber} restored to canvas!`);
+      await showSuccessDialog(`Version ${versionNumber} restored to canvas!`);
     } catch (error) {
       console.error('Failed to restore version:', error);
-      alert(`❌ Failed to restore version: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      await showErrorDialog(`Failed to restore version: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setRestoringVersion(null);
     }
@@ -94,13 +95,13 @@ const FeedPage = () => {
         setFeedback(feedback.map(f =>
           f.id === feedbackId ? { ...f, status: newStatus } : f
         ));
-        alert(`Feedback marked as ${newStatus}`);
+        await showSuccessDialog(`Feedback marked as ${newStatus}`);
       } else {
-        alert('Failed to update feedback status');
+        await showErrorDialog('Failed to update feedback status');
       }
     } catch (error) {
       console.error('Error updating feedback:', error);
-      alert('Failed to update feedback. Please try again.');
+      await showErrorDialog('Failed to update feedback. Please try again.');
     } finally {
       setUpdatingFeedback(null);
     }

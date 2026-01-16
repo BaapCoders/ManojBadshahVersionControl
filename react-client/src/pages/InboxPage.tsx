@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import BriefCard from '../components/BriefCard'
+import { showSuccessDialog, showErrorDialog, showInfoDialog } from '../utils/dialogUtils'
 
 interface Brief {
   id: number
@@ -66,10 +67,10 @@ const InboxPage = () => {
       // Refresh briefs to show the new design
       await fetchBriefs()
       
-      alert(`Design created! ID: ${design.id}. Switch to Generate tab to start designing.`)
+      await showSuccessDialog(`Design created! ID: ${design.id}. Switch to Generate tab to start designing.`)
     } catch (err) {
       console.error('Error creating design:', err)
-      alert('Failed to create design. Please try again.')
+      await showErrorDialog('Failed to create design. Please try again.')
     } finally {
       setCreatingDesign(null)
     }
@@ -103,9 +104,9 @@ const InboxPage = () => {
               offer={hasDesign ? `${brief.designs.length} Design(s)` : 'No Designs'}
               code={`#${brief.id}`}
               template={brief.status}
-              onOpenTemplate={() => {
+              onOpenTemplate={async () => {
                 if (hasDesign) {
-                  alert(`Design ID: ${brief.designs[0].id}. Switch to Generate tab.`)
+                  await showInfoDialog(`Design ID: ${brief.designs[0].id}. Switch to Generate tab.`)
                 } else {
                   handleCreateDesign(brief.id)
                 }

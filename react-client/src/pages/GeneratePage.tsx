@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { generateAssetPipeline, addImageToCanvas } from '../features/assetService';
 import { scanCanvasText, getTranslations, createLocalizedVariants } from '../features/localizationService';
 import { saveAsNewVersion, loadVersionHistory, type DesignVersion } from '../features/versionService';
+import { showSuccessDialog, showErrorDialog, showWarningDialog } from '../utils/dialogUtils';
 import { Save, GitBranch } from 'lucide-react';
 
 const GeneratePage = () => {
@@ -46,7 +47,7 @@ const GeneratePage = () => {
   // --- Version Control Handlers ---
   const handleSaveVersion = async () => {
     if (!currentDesignId) {
-      alert('No design selected. Please create a design from Inbox first.');
+      await showWarningDialog('No design selected. Please create a design from Inbox first.');
       return;
     }
 
@@ -55,18 +56,18 @@ const GeneratePage = () => {
       const result = await saveAsNewVersion(currentDesignId, commitMessage || undefined);
       
       if (result.success) {
-        alert(`✅ Version ${result.version?.versionNumber} saved successfully!`);
+        await showSuccessDialog(`Version ${result.version?.versionNumber} saved successfully!`);
         setCommitMessage('');
         setShowVersionDialog(false);
         
         // Reload version history
         await loadVersions(currentDesignId);
       } else {
-        alert(`❌ Failed to save version: ${result.error}`);
+        await showErrorDialog(`Failed to save version: ${result.error}`);
       }
     } catch (error) {
       console.error('Error saving version:', error);
-      alert('Failed to save version. Please try again.');
+      await showErrorDialog('Failed to save version. Please try again.');
     } finally {
       setIsSavingVersion(false);
     }
