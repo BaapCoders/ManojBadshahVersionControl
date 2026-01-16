@@ -170,7 +170,7 @@ export const getVersionPNG = async (designId: number, versionNumber: number): Pr
 };
 
 /**
- * Restore version by importing PNG to canvas with automatic page resize
+ * Restore version by importing PNG to canvas
  * @param designId - The design ID
  * @param versionNumber - The version number
  * @returns Success status
@@ -180,30 +180,36 @@ export const restoreVersionToCanvas = async (designId: number, versionNumber: nu
     console.log(`🔄 Restoring V${versionNumber} to canvas...`);
     
     // Fetch PNG through backend proxy (bypasses CORS)
-    const proxyUrl = `${API_BASE_URL}/designs/${designId}/versions/${versionNumber}/png`;
+    // Add timestamp to prevent browser caching and ensure fresh image
+    const timestamp = Date.now();
+    const proxyUrl = `${API_BASE_URL}/designs/${designId}/versions/${versionNumber}/png?t=${timestamp}`;
     console.log('📥 Downloading PNG via backend proxy...');
     
-    const response = await fetch(proxyUrl);
+    const response = await fetch(proxyUrl, {
+      cache: 'no-store', // Prevent browser from caching the response
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache'
+      }
+    });
+    
     if (!response.ok) {
       throw new Error(`Failed to download PNG: ${response.statusText}`);
     }
     
     const blob = await response.blob();
-    console.log(`✅ Downloaded: ${blob.size} bytes`);
+    console.log(`✅ Downloaded: ${blob.size} bytes (${blob.type})`);
 
-    // Import to canvas with automatic page resize to match image dimensions
-    console.log('🎨 Adding image to canvas and resizing page...');
+    // Import image to canvas using Adobe's addImage API
+    console.log('🎨 Adding image to canvas...');
     
-    // Get the document sandbox API proxy through the UI SDK's runtime
-    // @ts-ignore
-    const sandboxProxy = await addOnUISdk.instance.runtime.apiProxy("documentSandbox");
-    const result = await sandboxProxy.importImageWithPageResize(blob);
+    // @ts-ignore - Adobe Express API
+    await addOnUISdk.app.document.addImage(blob, {
+      title: `Version ${versionNumber}`,
+      author: 'Designer'
+    });
     
-    if (!result.success) {
-      throw new Error(result.error || 'Failed to import image');
-    }
-    
-    console.log('✅ Image added to canvas successfully with page resized!');
+    console.log('✅ Image added to canvas successfully!');
 
     return true;
   } catch (error) {
