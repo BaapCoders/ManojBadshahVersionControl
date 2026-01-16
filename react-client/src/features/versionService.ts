@@ -1,8 +1,9 @@
 // @ts-ignore
 // import addOnUISdk from "add-on-ui-sdk";
 import addOnUISdk from "https://new.express.adobe.com/static/add-on-sdk/sdk.js";
+import { API_URL } from '../config/env';
 
-const API_BASE_URL = 'http://localhost:8080/api';
+const API_BASE_URL = `${API_URL}/api`;
 
 /**
  * Version Control Service

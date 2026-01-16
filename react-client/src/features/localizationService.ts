@@ -1,7 +1,6 @@
 // @ts-ignore
 import addOnUISdk from "add-on-ui-sdk";
-
-const PYTHON_SERVER_URL = "http://127.0.0.1:8000";
+import { PYTHON_SERVER_URL } from '../config/env';
 
 // --- 1. SCAN ---
 export const scanCanvasText = async (): Promise<string[]> => {

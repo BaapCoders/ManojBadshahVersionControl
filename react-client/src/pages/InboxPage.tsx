@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import BriefCard from '../components/BriefCard'
 import { showSuccessDialog, showErrorDialog, showInfoDialog } from '../utils/dialogUtils'
+import { API_URL } from '../config/env'
 
 interface Brief {
   id: number
@@ -29,7 +30,7 @@ const InboxPage = () => {
 
   const fetchBriefs = async () => {
     try {
-      const response = await fetch('http://localhost:8080/api/briefs')
+      const response = await fetch(`${API_URL}/api/briefs`)
       if (!response.ok) {
         throw new Error('Failed to fetch briefs')
       }
@@ -46,7 +47,7 @@ const InboxPage = () => {
   const handleCreateDesign = async (briefId: number) => {
     setCreatingDesign(briefId)
     try {
-      const response = await fetch(`http://localhost:8080/api/briefs/${briefId}/designs`, {
+      const response = await fetch(`${API_URL}/api/briefs/${briefId}/designs`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

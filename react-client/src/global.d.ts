@@ -19,6 +19,14 @@ declare module "add-on-ui-sdk" {
     export default { ready, instance, app };
 }
 
+// Environment configuration injected by webpack
+declare const __ENV__: {
+    API_URL: string;
+    PYTHON_SERVER_URL: string;
+    VERSION: string;
+    DEBUG: boolean;
+};
+
 // Global window fallback
 declare global {
   interface Window {
