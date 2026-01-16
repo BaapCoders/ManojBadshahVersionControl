@@ -1,9 +1,14 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { addImageToCanvas, generateAssetPipeline } from '../features/assetService';
 import { createLocalizedVariants, getTranslations, scanCanvasText } from '../features/localizationService';
 
 const GeneratePage = () => {
   // --- Version Control State ---
+  const [currentDesignId, setCurrentDesignId] = useState<number | null>(() => {
+    const stored = localStorage.getItem('currentDesignId')
+    return stored ? parseInt(stored) : null
+  })
+
   // --- UI State: Asset Gen ---
   const [prompt, setPrompt] = useState("");
   const [category, setCategory] = useState("Illustration");
@@ -17,6 +22,22 @@ const GeneratePage = () => {
   const [locStatus, setLocStatus] = useState("");
 
   const languages = ["Hindi", "Marathi", "Spanish"];
+
+  // Listen for design changes
+  useEffect(() => {
+    const handleDesignChange = () => {
+      const newDesignId = localStorage.getItem('currentDesignId');
+      setCurrentDesignId(newDesignId ? parseInt(newDesignId) : null);
+    };
+
+    window.addEventListener('designChanged', handleDesignChange);
+    window.addEventListener('storage', handleDesignChange);
+
+    return () => {
+      window.removeEventListener('designChanged', handleDesignChange);
+      window.removeEventListener('storage', handleDesignChange);
+    };
+  }, []);
 
   const handleGenerate = async () => {
     if (!prompt) return;
@@ -93,6 +114,38 @@ const GeneratePage = () => {
 
   return (
     <div className="space-y-4 pb-10">
+      {/* Active Design Banner */}
+      {currentDesignId ? (
+        <div className="bg-gradient-to-r from-green-600 to-emerald-600 rounded-xl p-4 text-white shadow-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="bg-white/20 p-2 rounded-lg">
+                <span className="text-xl">🎨</span>
+              </div>
+              <div>
+                <p className="text-sm font-medium opacity-90">Working on</p>
+                <p className="text-lg font-bold">Design #{currentDesignId}</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-xs opacity-90">Save versions in</p>
+              <p className="text-sm font-semibold">Feed Tab →</p>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="bg-gradient-to-r from-orange-500 to-red-500 rounded-xl p-4 text-white shadow-lg">
+          <div className="flex items-center gap-3">
+            <div className="bg-white/20 p-2 rounded-lg">
+              <span className="text-xl">⚠️</span>
+            </div>
+            <div>
+              <p className="text-sm font-medium">No design selected</p>
+              <p className="text-xs opacity-90">Go to Inbox tab to create or select a design</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Asset Generator UI */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">

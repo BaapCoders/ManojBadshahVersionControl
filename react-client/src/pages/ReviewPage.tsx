@@ -1,9 +1,28 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Send } from 'lucide-react'
 
 const ReviewPage = () => {
     const [selectedApprover, setSelectedApprover] = useState('Marketing Manager - Whatsapp')
     const [showApproverDropdown, setShowApproverDropdown] = useState(false)
+    const [currentDesignId, setCurrentDesignId] = useState<number | null>(() => {
+        const stored = localStorage.getItem('currentDesignId')
+        return stored ? parseInt(stored) : null
+    })
+
+    useEffect(() => {
+        const handleDesignChange = () => {
+            const newDesignId = localStorage.getItem('currentDesignId');
+            setCurrentDesignId(newDesignId ? parseInt(newDesignId) : null);
+        };
+
+        window.addEventListener('designChanged', handleDesignChange);
+        window.addEventListener('storage', handleDesignChange);
+
+        return () => {
+            window.removeEventListener('designChanged', handleDesignChange);
+            window.removeEventListener('storage', handleDesignChange);
+        };
+    }, []);
 
     const approvers = [
         'Marketing Manager - Whatsapp',
@@ -13,6 +32,35 @@ const ReviewPage = () => {
 
     return (
         <div className="space-y-4">
+            {/* Active Design Banner */}
+            {currentDesignId ? (
+                <div className="bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl p-4 text-white shadow-lg">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="bg-white/20 p-2 rounded-lg">
+                                <Send size={20} />
+                            </div>
+                            <div>
+                                <p className="text-sm font-medium opacity-90">Ready to Send</p>
+                                <p className="text-lg font-bold">Design #{currentDesignId}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            ) : (
+                <div className="bg-gradient-to-r from-orange-500 to-red-500 rounded-xl p-4 text-white shadow-lg">
+                    <div className="flex items-center gap-3">
+                        <div className="bg-white/20 p-2 rounded-lg">
+                            <span className="text-xl">⚠️</span>
+                        </div>
+                        <div>
+                            <p className="text-sm font-medium">No design selected</p>
+                            <p className="text-xs opacity-90">Go to Inbox tab to create or select a design</p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Select Approver */}
             <div className="bg-white rounded-xl border border-gray-200 p-6">
                 <h2 className="text-lg font-bold text-gray-900 mb-4">Select Approver</h2>

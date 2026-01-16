@@ -22,6 +22,10 @@ const InboxPage = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [creatingDesign, setCreatingDesign] = useState<number | null>(null)
+  const [currentDesignId, setCurrentDesignId] = useState<number | null>(() => {
+    const stored = localStorage.getItem('currentDesignId')
+    return stored ? parseInt(stored) : null
+  })
 
   useEffect(() => {
     fetchBriefs()
@@ -63,6 +67,10 @@ const InboxPage = () => {
       
       // Store design ID for use in other pages
       localStorage.setItem('currentDesignId', design.id.toString())
+      setCurrentDesignId(design.id)
+      
+      // Dispatch storage event for other components to listen
+      window.dispatchEvent(new Event('designChanged'))
       
       // Refresh briefs to show the new design
       await fetchBriefs()
@@ -87,16 +95,33 @@ const InboxPage = () => {
     return <div className="text-center py-8 text-gray-500">No briefs found</div>
   }
 
+  const handleSelectDesign = (designId: number) => {
+    localStorage.setItem('currentDesignId', designId.toString())
+    setCurrentDesignId(designId)
+    
+    // Dispatch event to notify other components
+    window.dispatchEvent(new Event('designChanged'))
+    
+    console.log(`Design #${designId} selected. Switch to Feed/Review tab to view versions.`)
+  }
+
   return (
     <div className="space-y-4">
       {briefs.map((brief) => {
         const hasDesign = brief.designs && brief.designs.length > 0
+        const designId = hasDesign ? brief.designs[0].id : null
+        const isActive = designId === currentDesignId
         const statusColor = 
           brief.status === 'completed' ? 'bg-green-500' :
           brief.status === 'in-progress' ? 'bg-blue-500' : 'bg-orange-500'
 
         return (
           <div key={brief.id} className="relative">
+            {/* Active Design Indicator */}
+            {isActive && hasDesign && (
+              <div className="absolute -left-1 top-0 bottom-0 w-1 bg-blue-500 rounded-l-lg z-10"></div>
+            )}
+            
             <BriefCard
               title={`Brief from ${brief.client.name || brief.client.phoneNumber}`}
               campaign={brief.description.substring(0, 50) + (brief.description.length > 50 ? '...' : '')}
@@ -105,7 +130,7 @@ const InboxPage = () => {
               template={brief.status}
               onOpenTemplate={async () => {
                 if (hasDesign) {
-                  console.log(`Design ID: ${brief.designs[0].id}. Switch to Generate tab.`)
+                  handleSelectDesign(brief.designs[0].id)
                 } else {
                   handleCreateDesign(brief.id)
                 }
@@ -128,6 +153,22 @@ const InboxPage = () => {
                   className="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg font-semibold transition-all duration-200 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {creatingDesign === brief.id ? 'Creating Design...' : '🎨 Create Design'}
+                </button>
+              </div>
+            )}
+
+            {/* View Design Button */}
+            {hasDesign && (
+              <div className="mt-2">
+                <button
+                  onClick={() => handleSelectDesign(brief.designs[0].id)}
+                  className={`w-full px-4 py-2.5 rounded-lg font-semibold transition-all duration-200 ${
+                    isActive
+                      ? 'bg-blue-600 text-white shadow-lg'
+                      : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                  }`}
+                >
+                  {isActive ? '✓ Active Design' : '👁️ View Design Versions'}
                 </button>
               </div>
             )}

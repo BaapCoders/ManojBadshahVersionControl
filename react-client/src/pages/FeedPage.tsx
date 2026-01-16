@@ -42,6 +42,24 @@ const FeedPage = () => {
     } else {
       setLoading(false);
     }
+
+    // Listen for design changes from other components
+    const handleDesignChange = () => {
+      const newDesignId = localStorage.getItem('currentDesignId');
+      if (newDesignId) {
+        const id = parseInt(newDesignId);
+        setCurrentDesignId(id);
+        loadData(id);
+      }
+    };
+
+    window.addEventListener('designChanged', handleDesignChange);
+    window.addEventListener('storage', handleDesignChange);
+
+    return () => {
+      window.removeEventListener('designChanged', handleDesignChange);
+      window.removeEventListener('storage', handleDesignChange);
+    };
   }, []);
 
   const loadData = async (designId: number) => {
@@ -209,6 +227,25 @@ const FeedPage = () => {
 
   return (
     <div className="space-y-6 pb-6">
+      {/* Active Design Info Banner */}
+      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl p-4 text-white shadow-lg">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="bg-white/20 p-2 rounded-lg">
+              <GitBranch size={20} />
+            </div>
+            <div>
+              <p className="text-sm font-medium opacity-90">Currently Viewing</p>
+              <p className="text-lg font-bold">Design #{currentDesignId}</p>
+            </div>
+          </div>
+          <div className="text-right">
+            <p className="text-sm opacity-90">{versions.length} Versions</p>
+            <p className="text-sm opacity-90">{feedback.length} Feedback</p>
+          </div>
+        </div>
+      </div>
+
       {/* Version History Section */}
       <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border-2 border-blue-200 p-6 shadow-sm">
         <div className="flex items-center justify-between mb-4">

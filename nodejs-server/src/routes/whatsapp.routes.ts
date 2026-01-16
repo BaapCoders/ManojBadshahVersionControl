@@ -10,6 +10,9 @@ console.log('✅ WhatsApp routes loaded');
 
 router.post('/webhook', async (req: Request, res: Response) => {
   console.log('📩 WhatsApp webhook POST received');
+  
+  // 🔍 DEBUG: Log the entire webhook payload
+  console.log('📦 Full webhook body:', JSON.stringify(req.body, null, 2));
 
   // IMPORTANT: respond immediately
   res.sendStatus(200);
@@ -17,15 +20,55 @@ router.post('/webhook', async (req: Request, res: Response) => {
   try {
     const entry = req.body.entry?.[0];
     const change = entry?.changes?.[0];
-    const message = change?.value?.messages?.[0];
+    const value = change?.value;
+    const message = value?.messages?.[0];
 
-    if (!message || !message.text) {
-      console.log('ℹ️ No user message (status / delivery event)');
+    // 🔍 DEBUG: Log parsed structure
+    console.log('📋 Entry:', entry ? '✓' : '✗');
+    console.log('📋 Change:', change ? '✓' : '✗');
+    console.log('📋 Value:', value ? '✓' : '✗');
+    console.log('📋 Message:', message ? '✓' : '✗');
+    
+    if (message) {
+      console.log('📋 Message type:', message.type);
+      console.log('📋 Message ID:', message.id);
+      console.log('📋 Message from:', message.from);
+    }
+
+    // Handle different message types
+    if (!message) {
+      console.log('ℹ️ No message object (could be status update, delivery receipt, or read receipt)');
+      if (value?.statuses) {
+        console.log('📬 Status update received:', value.statuses[0]?.status);
+      }
+      return;
+    }
+
+    // Extract message based on type
+    let textBody: string | null = null;
+    
+    if (message.type === 'text' && message.text?.body) {
+      textBody = message.text.body;
+    } else if (message.type === 'interactive' && message.interactive) {
+      // Handle button/list replies
+      if (message.interactive.type === 'button_reply') {
+        textBody = message.interactive.button_reply.title;
+      } else if (message.interactive.type === 'list_reply') {
+        textBody = message.interactive.list_reply.title;
+      }
+    } else if (message.type === 'button' && message.button) {
+      textBody = message.button.text;
+    } else {
+      console.log(`ℹ️ Unsupported message type: ${message.type}`);
+      return;
+    }
+
+    if (!textBody) {
+      console.log('ℹ️ No text content in message');
       return;
     }
 
     const from = message.from;
-    const textBody = message.text.body;
     const text = textBody.toLowerCase().trim();
     const messageId = message.id;
 
