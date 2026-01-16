@@ -2,11 +2,11 @@ import { useState, useEffect } from 'react';
 import {
   loadVersionHistory,
   loadFeedback,
-  restoreVersion,
+  getVersionPNG,
   updateFeedbackStatus,
   type DesignVersion
 } from '../features/versionService';
-import { GitBranch, RotateCcw, MessageSquare, CheckCircle, XCircle } from 'lucide-react';
+import { GitBranch, Eye, MessageSquare, CheckCircle, XCircle, X } from 'lucide-react';
 
 interface Feedback {
   id: number;
@@ -22,7 +22,7 @@ const FeedPage = () => {
   const [versions, setVersions] = useState<DesignVersion[]>([]);
   const [feedback, setFeedback] = useState<Feedback[]>([]);
   const [loading, setLoading] = useState(true);
-  const [restoringVersion, setRestoringVersion] = useState<number | null>(null);
+  const [viewingPNG, setViewingPNG] = useState<string | null>(null);
   const [updatingFeedback, setUpdatingFeedback] = useState<number | null>(null);
 
   useEffect(() => {
@@ -53,40 +53,14 @@ const FeedPage = () => {
     }
   };
 
-  const handleRestoreVersion = async (versionNumber: number) => {
-    if (!currentDesignId) {
-      console.error('❌ No currentDesignId found');
-      alert('Error: No design selected');
-      return;
-    }
+  const handleViewPNG = async (versionNumber: number) => {
+    if (!currentDesignId) return;
 
-    console.log(`🔄 Step 1: Starting restore for V${versionNumber}, Design ${currentDesignId}`);
-
-    // Skip confirmation and directly proceed
-    console.log('✅ Step 2: Proceeding with restoration...');
-    setRestoringVersion(versionNumber);
-
-    try {
-      console.log('🔄 Step 3: Calling restoreVersion...');
-      const result:any = await Promise.race([
-        restoreVersion(currentDesignId, versionNumber),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout after 30s')), 30000))
-      ]);
-
-      console.log('✅ Step 4: Got result:', result);
-
-      if (result.success) {
-        alert(`✅ Successfully restored to Version ${versionNumber}!`);
-        await loadData(currentDesignId);
-      } else {
-        alert(`❌ Failed to restore: ${result.message}`);
-      }
-    } catch (error) {
-      console.error('❌ CRITICAL ERROR:', error);
-      alert(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    } finally {
-      console.log('🏁 Cleanup');
-      setRestoringVersion(null);
+    const pngUrl = await getVersionPNG(currentDesignId, versionNumber);
+    if (pngUrl) {
+      setViewingPNG(pngUrl);
+    } else {
+      alert('No PNG preview available for this version');
     }
   };
 
@@ -180,6 +154,29 @@ const FeedPage = () => {
                 className="bg-white rounded-lg p-4 border-2 border-gray-200 hover:border-blue-400 hover:shadow-md transition-all"
               >
                 <div className="flex items-start justify-between gap-4">
+                  {/* PNG Preview Thumbnail */}
+                  <div className="flex-shrink-0">
+                    {version.previewUrl ? (
+                      <img 
+                        src={version.previewUrl} 
+                        alt={`V${version.versionNumber} Preview`}
+                        className="w-24 h-24 object-cover rounded-lg border-2 border-gray-200 shadow-sm"
+                        onError={(e) => {
+                          // Fallback if S3 image fails to load
+                          (e.target as HTMLImageElement).style.display = 'none';
+                          const fallback = document.createElement('div');
+                          fallback.className = 'w-24 h-24 bg-gray-100 rounded-lg border-2 border-gray-200 flex items-center justify-center';
+                          fallback.innerHTML = '<span class="text-xs text-gray-400">No Preview</span>';
+                          (e.target as HTMLImageElement).parentNode?.appendChild(fallback);
+                        }}
+                      />
+                    ) : (
+                      <div className="w-24 h-24 bg-gray-100 rounded-lg border-2 border-gray-200 flex items-center justify-center">
+                        <span className="text-xs text-gray-400">No Preview</span>
+                      </div>
+                    )}
+                  </div>
+
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">
                       <span className="bg-blue-600 text-white text-xs font-bold px-2.5 py-1 rounded-full">
@@ -188,6 +185,11 @@ const FeedPage = () => {
                       {index === 0 && (
                         <span className="bg-green-100 text-green-700 text-xs font-semibold px-2 py-0.5 rounded">
                           Latest
+                        </span>
+                      )}
+                      {version.previewUrl && (
+                        <span className="bg-purple-100 text-purple-700 text-xs font-semibold px-2 py-0.5 rounded">
+                          📸 S3
                         </span>
                       )}
                     </div>
@@ -201,22 +203,19 @@ const FeedPage = () => {
                     <div className="flex items-center gap-4 text-xs text-gray-500">
                       <span>👤 {version.createdBy}</span>
                       <span>📅 {formatDate(version.createdAt)}</span>
-                      {version.serializedState && (
-                        <span className="text-green-600 font-semibold">✓ Restorable</span>
-                      )}
                     </div>
                   </div>
 
                   <button
-                    onClick={() => handleRestoreVersion(version.versionNumber)}
-                    disabled={restoringVersion === version.versionNumber || !version.serializedState}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all shadow-sm ${!version.serializedState
+                    onClick={() => handleViewPNG(version.versionNumber)}
+                    disabled={!version.previewUrl}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all shadow-sm ${!version.previewUrl
                         ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                        : 'bg-blue-600 text-white hover:bg-blue-700 hover:shadow-md active:scale-95'
+                        : 'bg-purple-600 text-white hover:bg-purple-700 hover:shadow-md active:scale-95'
                       }`}
                   >
-                    <RotateCcw size={16} className={restoringVersion === version.versionNumber ? 'animate-spin' : ''} />
-                    {restoringVersion === version.versionNumber ? 'Restoring...' : 'Restore'}
+                    <Eye size={16} />
+                    View PNG
                   </button>
                 </div>
               </div>
@@ -347,6 +346,29 @@ const FeedPage = () => {
           </li>
         </ul>
       </div>
+
+      {/* PNG Viewer Modal */}
+      {viewingPNG && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
+          onClick={() => setViewingPNG(null)}
+        >
+          <div className="relative max-w-4xl max-h-[90vh] bg-white rounded-xl shadow-2xl overflow-hidden">
+            <button
+              onClick={() => setViewingPNG(null)}
+              className="absolute top-4 right-4 bg-red-600 text-white p-2 rounded-full hover:bg-red-700 transition-colors z-10"
+            >
+              <X size={24} />
+            </button>
+            <img 
+              src={viewingPNG} 
+              alt="Version Preview" 
+              className="max-w-full max-h-[90vh] object-contain"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
 }

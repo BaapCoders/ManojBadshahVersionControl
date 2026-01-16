@@ -5,7 +5,7 @@ const API_BASE_URL = 'http://localhost:8080/api';
 
 /**
  * Version Control Service
- * Integrates Adobe Express Document Sandbox APIs with backend version management
+ * PNG Export → S3 Storage → View Thumbnails
  */
 
 export interface VersionData {
@@ -21,9 +21,7 @@ export interface DesignVersion {
   designId: number;
   versionNumber: number;
   commitMessage: string | null;
-  adobeProjectId: string | null;
   previewUrl: string | null;
-  serializedState: string | null;
   createdBy: string;
   createdAt: string;
 }
@@ -36,6 +34,7 @@ export interface SaveVersionResult {
 
 /**
  * Save current canvas as a new version
+ * REDESIGNED: Export PNG blob → Upload to S3 → Save version
  * @param designId - The design ID to save version for
  * @param commitMessage - Optional commit message
  * @returns Save result with version data
@@ -47,9 +46,6 @@ export const saveAsNewVersion = async (
   try {
     console.log(`💾 Saving new version for design ${designId}...`);
 
-    // Get the document sandbox proxy
-    const sandbox = await addOnUISdk.instance.runtime.apiProxy("documentSandbox");
-
     // Get current version number from backend
     const versionsResponse = await fetch(`${API_BASE_URL}/designs/${designId}/versions`);
     if (!versionsResponse.ok) {
@@ -58,28 +54,36 @@ export const saveAsNewVersion = async (
     const versions: DesignVersion[] = await versionsResponse.json();
     const nextVersionNumber = versions.length + 1;
 
-    // Serialize canvas state
-    console.log('📝 Serializing canvas state...');
-    const serializedState = await sandbox.serializeCanvas();
+    // Export current page as PNG using Adobe's native API
+    console.log('📸 Exporting poster as PNG...');
+    const renditions = await addOnUISdk.app.document.createRenditions(
+      {
+        range: addOnUISdk.constants.Range.currentPage,
+        format: addOnUISdk.constants.RenditionFormat.png,
+      },
+      addOnUISdk.constants.RenditionIntent.export
+    );
 
-    // Clone page in Adobe Express
-    console.log(`🎨 Creating page clone for V${nextVersionNumber}...`);
-    const cloneResult = await sandbox.captureVersionSnapshot();
-
-    if (!cloneResult.success) {
-      throw new Error('Failed to capture version snapshot');
+    if (!renditions || renditions.length === 0) {
+      throw new Error('Failed to create PNG rendition');
     }
 
-    // Save to backend
-    console.log('💾 Saving to backend...');
+    const pngBlob = renditions[0].blob;
+    console.log(`✅ PNG exported: ${pngBlob.size} bytes (${pngBlob.type})`);
+
+    // Convert blob to base64 for backend upload
+    console.log('🔄 Converting blob to base64...');
+    const base64PNG = await blobToBase64(pngBlob);
+
+    // Save to backend (backend will upload PNG to S3)
+    console.log('☁️ Uploading to S3 via backend...');
     const response = await fetch(`${API_BASE_URL}/designs/${designId}/versions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         commitMessage: commitMessage || `Version ${nextVersionNumber}`,
-        adobeProjectId: cloneResult.snapshotPageId,
-        serializedState: serializedState,
-        // previewUrl would come from image export
+        pngBase64: base64PNG,
+        createdBy: 'designer'
       }),
     });
 
@@ -89,7 +93,7 @@ export const saveAsNewVersion = async (
 
     const savedVersion: DesignVersion = await response.json();
 
-    console.log(`✅ Version ${nextVersionNumber} saved successfully!`);
+    console.log(`✅ Version ${nextVersionNumber} saved with preview URL: ${savedVersion.previewUrl}`);
 
     return {
       success: true,
@@ -102,6 +106,23 @@ export const saveAsNewVersion = async (
       error: error instanceof Error ? error.message : 'Unknown error',
     };
   }
+};
+
+/**
+ * Convert blob to base64 string
+ */
+const blobToBase64 = (blob: Blob): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64 = reader.result as string;
+      // Remove data:image/png;base64, prefix
+      const base64Data = base64.split(',')[1];
+      resolve(base64Data);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
 };
 
 /**
@@ -124,62 +145,25 @@ export const loadVersionHistory = async (designId: number): Promise<DesignVersio
 };
 
 /**
- * Restore a previous version to the canvas
+ * Get version PNG URL for viewing
  * @param designId - The design ID
- * @param versionNumber - The version number to restore
- * @returns Restore result with version data
+ * @param versionNumber - The version number
+ * @returns PNG URL or null
  */
-export const restoreVersion = async (designId: number, versionNumber: number) => {
+export const getVersionPNG = async (designId: number, versionNumber: number): Promise<string | null> => {
   try {
-    console.log(`[versionService] 🔄 Step A: Fetching versions for design ${designId}`);
-    
     const response = await fetch(`${API_BASE_URL}/designs/${designId}/versions`);
-    console.log(`[versionService] ✅ Step B: Got response, status: ${response.status}`);
-    
     if (!response.ok) {
       throw new Error('Failed to fetch version data');
     }
 
     const versions: DesignVersion[] = await response.json();
-    console.log(`[versionService] ✅ Step C: Parsed ${versions.length} versions`);
-    
     const targetVersion = versions.find(v => v.versionNumber === versionNumber);
-    console.log(`[versionService] 🔍 Step D: Target version found:`, targetVersion ? 'YES' : 'NO');
 
-    if (!targetVersion) {
-      throw new Error(`Version ${versionNumber} not found`);
-    }
-
-    if (!targetVersion.serializedState) {
-      console.error(`[versionService] ❌ Step E: No serializedState!`);
-      throw new Error('No serialized state found for this version');
-    }
-
-    console.log(`[versionService] ✅ Step F: Has serializedState (${targetVersion.serializedState.length} chars)`);
-    console.log(`[versionService] 🔄 Step G: Getting document sandbox proxy...`);
-    
-    const sandbox = await addOnUISdk.instance.runtime.apiProxy("documentSandbox");
-    console.log(`[versionService] ✅ Step H: Got sandbox proxy`);
-
-    console.log(`[versionService] 🔄 Step I: Calling sandbox.restoreFromJson...`);
-    const restoreResult = await sandbox.restoreFromJson(targetVersion.serializedState);
-    console.log(`[versionService] ✅ Step J: restoreFromJson returned:`, restoreResult);
-
-    if (!restoreResult.success) {
-      throw new Error(restoreResult.message || 'Failed to restore canvas');
-    }
-
-    return {
-      success: true,
-      message: `Version ${versionNumber} restored successfully`,
-      version: targetVersion,
-    };
+    return targetVersion?.previewUrl || null;
   } catch (error) {
-    console.error('[versionService] ❌ FATAL ERROR:', error);
-    return {
-      success: false,
-      message: error instanceof Error ? error.message : 'Unknown error',
-    };
+    console.error('❌ Failed to get version PNG:', error);
+    return null;
   }
 };
 

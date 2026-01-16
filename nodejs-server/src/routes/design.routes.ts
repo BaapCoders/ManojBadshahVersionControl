@@ -144,15 +144,12 @@ router.get('/designs/:id', async (req: Request, res: Response) => {
 router.post('/designs/:id/versions', async (req: Request, res: Response) => {
   try {
     const designId = parseInt(req.params.id);
-    const { commitMessage, adobeProjectId, previewUrl, assets, serializedState } = req.body;
+    const { commitMessage, pngBase64, createdBy } = req.body;
     
     const version = await designService.createVersion(designId, {
       commitMessage,
-      adobeProjectId,
-      previewUrl,
-      assets,
-      serializedState,
-      createdBy: 'designer'
+      pngBase64,
+      createdBy: createdBy || 'designer'
     });
     
     res.status(201).json(version);

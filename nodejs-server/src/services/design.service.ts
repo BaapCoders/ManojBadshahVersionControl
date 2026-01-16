@@ -152,20 +152,13 @@ export const getDesignById = async (id: number) => {
 
 interface CreateVersionData {
   commitMessage?: string;
-  adobeProjectId?: string;
-  previewUrl?: string;
-  serializedState?: string;
+  pngBase64?: string;
   createdBy?: string;
-  assets?: {
-    fileUrl: string;
-    fileType: string;
-    fileName: string;
-    fileSize?: number;
-  }[];
 }
 
 /**
  * COMMIT: Create a new version (like git commit)
+ * Uploads PNG blob to S3 and saves version
  */
 export const createVersion = async (designId: number, data: CreateVersionData) => {
   const design = await prisma.design.findUnique({
@@ -187,22 +180,40 @@ export const createVersion = async (designId: number, data: CreateVersionData) =
     ? design.versions[0].versionNumber + 1 
     : 1;
 
+  console.log(`📸 Processing PNG for V${nextVersionNumber}...`);
+  
+  let previewUrl: string | undefined = undefined;
+  
+  // Upload PNG if base64 is provided
+  if (data.pngBase64) {
+    try {
+      console.log('☁️ Uploading PNG to S3...');
+      
+      // Upload base64 PNG to S3
+      const { uploadBase64PNG } = await import('./s3Upload.service');
+      const uploadResult = await uploadBase64PNG(data.pngBase64, designId, nextVersionNumber);
+      
+      if (uploadResult.success && uploadResult.url) {
+        previewUrl = uploadResult.url;
+        console.log(`✅ Uploaded to S3: ${previewUrl}`);
+      } else {
+        console.error('❌ S3 upload failed:', uploadResult.error);
+      }
+      
+    } catch (error) {
+      console.error('❌ PNG upload failed:', error);
+      // Continue without preview URL - don't fail the version creation
+    }
+  }
+
   // Create new version
   const version = await prisma.designVersion.create({
     data: {
       designId,
       versionNumber: nextVersionNumber,
       commitMessage: data.commitMessage || `Version ${nextVersionNumber}`,
-      adobeProjectId: data.adobeProjectId,
-      previewUrl: data.previewUrl,
-      serializedState: data.serializedState,
-      createdBy: data.createdBy || 'designer',
-      assets: data.assets ? {
-        create: data.assets
-      } : undefined
-    },
-    include: {
-      assets: true
+      previewUrl: previewUrl,
+      createdBy: data.createdBy || 'designer'
     }
   });
 
@@ -211,6 +222,8 @@ export const createVersion = async (designId: number, data: CreateVersionData) =
     where: { id: designId },
     data: { currentVersion: nextVersionNumber }
   });
+
+  console.log(`✅ Version ${nextVersionNumber} created with preview URL`);
 
   return version;
 };
@@ -271,18 +284,11 @@ export const revertToVersion = async (designId: number, targetVersionNumber: num
     throw new Error(`Version ${targetVersionNumber} not found`);
   }
 
-  // Create a new version as a copy of target (non-destructive revert)
+  // Note: This will create a new version without PNG since we can't regenerate it
+  // The previewUrl will be null for reverted versions
   const newVersion = await createVersion(designId, {
     commitMessage: `Reverted to V${targetVersionNumber}`,
-    adobeProjectId: targetVersion.adobeProjectId,
-    previewUrl: targetVersion.previewUrl,
-    createdBy: 'designer',
-    assets: targetVersion.assets.map(asset => ({
-      fileUrl: asset.fileUrl,
-      fileType: asset.fileType,
-      fileName: asset.fileName,
-      fileSize: asset.fileSize || undefined
-    }))
+    createdBy: 'designer'
   });
 
   return newVersion;
@@ -310,7 +316,6 @@ export const compareVersions = async (designId: number, version1: number, versio
     version1: v1,
     version2: v2,
     changes: {
-      adobeProjectIdChanged: v1.adobeProjectId !== v2.adobeProjectId,
       previewUrlChanged: v1.previewUrl !== v2.previewUrl,
       assetsChanged: v1.assets.length !== v2.assets.length
     }

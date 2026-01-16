@@ -178,11 +178,13 @@ async function seedTestData() {
     console.log('  - 3 Designs with version history');
     console.log('  - Multiple versions with commit messages');
     console.log('  - Feedback items on various versions');
+    console.log('\n⚠️  Note: Seeded versions have no PNG previews (previewUrl: null)');
+    console.log('   To see PNG previews, save new versions from Adobe Express addon');
     console.log('\n🚀 Now start the server and check the addon!');
     console.log('   → Inbox: See all 4 briefs');
     console.log('   → Click "Create Design" or view existing designs');
-    console.log('   → Generate tab: Save versions');
-    console.log('   → Activity tab: View version history & feedback');
+    console.log('   → Generate tab: Save versions with PNG export to S3');
+    console.log('   → Activity tab: View version history & feedback (click "View PNG" for full-size)');
 
   } catch (error) {
     console.error('❌ Seed failed:', error);

@@ -1,10 +1,12 @@
 import addOnSandboxSdk from "add-on-sdk-document-sandbox";
 import { scanForText, createPageVariant } from "./features/localization";
-import { captureVersionSnapshot, restoreVersionSnapshot, serializeCanvas, restoreFromJson, exportPreview } from "./features/versionControl";
+import { serializeCanvas, restoreFromJson } from "./features/versionControl";
 
 const { runtime } = addOnSandboxSdk.instance;
 
 // Expose the API to the UI thread
+// SIMPLIFIED: Removed captureVersionSnapshot and restoreVersionSnapshot (page cloning)
+// Now focuses on serialization for server-side PNG generation
 runtime.exposeApi({
     ready: () => true,
     
@@ -12,10 +14,7 @@ runtime.exposeApi({
     scanText: async () => scanForText(),
     createVariant: async (lang, trans) => await createPageVariant(lang, trans),
     
-    // Version Control APIs
-    captureVersionSnapshot: async () => await captureVersionSnapshot(),
-    restoreVersionSnapshot: async (snapshotPageId) => await restoreVersionSnapshot(snapshotPageId),
+    // Version Control APIs - SIMPLIFIED
     serializeCanvas: async () => await serializeCanvas(),
-    restoreFromJson: async (jsonString) => await restoreFromJson(jsonString),
-    exportPreview: async () => await exportPreview()
+    restoreFromJson: async (jsonString) => await restoreFromJson(jsonString)
 });

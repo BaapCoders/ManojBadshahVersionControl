@@ -57,9 +57,7 @@ model DesignVersion {
   design         Design    @relation(fields: [designId], references: [id], onDelete: Cascade)
   versionNumber  Int
   commitMessage  String?   // Git-like commit message
-  adobeProjectId String?   // Adobe Express project ID (page ID for cloned pages)
-  previewUrl     String?   // Preview image URL
-  serializedState String?  @db.Text // JSON serialized canvas state for restore
+  previewUrl     String?   // S3 PNG preview URL
   assets         Asset[]
   feedback       Feedback[]
   createdBy      String    @default("designer") // "designer" or "auto"
