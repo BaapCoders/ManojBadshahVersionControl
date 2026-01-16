@@ -1,6 +1,6 @@
 // @ts-ignore
 // import addOnUISdk from "add-on-ui-sdk";
-import addOnUISdk from "https://new.express.adobe.com/static/add-on-sdk/sdk.js";
+import addOnUISdk, { RuntimeType } from "https://new.express.adobe.com/static/add-on-sdk/sdk.js";
 import { API_URL } from '../config/env';
 
 const API_BASE_URL = `${API_URL}/api`;
@@ -170,14 +170,15 @@ export const getVersionPNG = async (designId: number, versionNumber: number): Pr
 };
 
 /**
- * Restore version by importing PNG to canvas
+ * Restore version by importing PNG to canvas and automatically resizing page to match image dimensions
+ * Uses document sandbox API for page manipulation
  * @param designId - The design ID
  * @param versionNumber - The version number
  * @returns Success status
  */
 export const restoreVersionToCanvas = async (designId: number, versionNumber: number): Promise<boolean> => {
   try {
-    console.log(`🔄 Restoring V${versionNumber} to canvas...`);
+    console.log(`🔄 Restoring V${versionNumber} to canvas with auto-resize...`);
     
     // Fetch PNG through backend proxy (bypasses CORS)
     // Add timestamp to prevent browser caching and ensure fresh image
@@ -200,16 +201,20 @@ export const restoreVersionToCanvas = async (designId: number, versionNumber: nu
     const blob = await response.blob();
     console.log(`✅ Downloaded: ${blob.size} bytes (${blob.type})`);
 
-    // Import image to canvas using Adobe's addImage API
-    console.log('🎨 Adding image to canvas...');
+    // Get document sandbox proxy to access page resizing APIs
+    console.log('🔗 Connecting to document sandbox...');
+    const { runtime } = addOnUISdk.instance;
+    const sandboxProxy = await runtime.apiProxy(RuntimeType.documentSandbox);
     
-    // @ts-ignore - Adobe Express API
-    await addOnUISdk.app.document.addImage(blob, {
-      title: `Version ${versionNumber}`,
-      author: 'Designer'
-    });
+    // Call the document sandbox API to import image with automatic page resize
+    console.log('🎨 Importing image with page auto-resize...');
+    const result = await sandboxProxy.importImageWithPageResize(blob);
     
-    console.log('✅ Image added to canvas successfully!');
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to import image');
+    }
+    
+    console.log('✅ Image restored and page resized successfully!');
 
     return true;
   } catch (error) {
