@@ -1,5 +1,6 @@
 // @ts-ignore
-import addOnUISdk from "add-on-ui-sdk";
+// import addOnUISdk from "add-on-ui-sdk";
+import addOnUISdk from "https://new.express.adobe.com/static/add-on-sdk/sdk.js";
 
 const API_BASE_URL = 'http://localhost:8080/api';
 
